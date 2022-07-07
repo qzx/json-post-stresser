@@ -44,15 +44,13 @@ func main() {
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
 
-			for {
-				err := makeCall(&c)
-				if err != nil {
-					errn++
-				} else {
-					count++
-				}
-				break
+			err := c.makeCall()
+			if err != nil {
+				errn++
+			} else {
+				count++
 			}
+
 		}(&wg)
 	}
 
@@ -64,25 +62,28 @@ func main() {
 
 func configFromArgs(a []string) config {
 	var c config
+
 	reqUrl, err := url.Parse(os.Args[2])
 	if err != nil {
 		panic("Couldn't parse url")
 	}
-	c.url = os.Args[2]
 	if reqUrl.Scheme == "https" {
 		c.isHTTPS = true
 	} else {
 		c.isHTTPS = false
 	}
+	c.url = os.Args[2]
 
 	c.bearerToken = fmt.Sprintf("Bearer %s", a[1])
+
 	c.method = "POST"
+
 	payloadData, err := ioutil.ReadFile(a[3])
 	if err != nil {
 		panic("Couldn't open json payload file")
 	}
-	payload := string(payloadData)
-	c.payload = payload
+	c.payload = string(payloadData)
+
 	connections, err := strconv.Atoi(os.Args[4])
 	if err != nil {
 		panic("connections should be a integer")
@@ -92,7 +93,7 @@ func configFromArgs(a []string) config {
 	return c
 }
 
-func makeCall(c *config) error {
+func (c *config) makeCall() error {
 	payload := strings.NewReader(c.payload)
 
 	client := &http.Client{}
@@ -101,24 +102,19 @@ func makeCall(c *config) error {
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		client.Transport = customTransport
 	}
-	req, err := http.NewRequest(c.method, c.url, payload)
 
+	req, err := http.NewRequest(c.method, c.url, payload)
 	if err != nil {
 		return err
 	}
 	req.Header.Add("Authorization", c.bearerToken)
 	req.Header.Add("Content-Type", "application/json")
 
-	res, err := client.Do(req)
+	_, err = client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
 
-	_, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
